@@ -70,11 +70,9 @@ type ToolFailure = {
   meta?: string;
 };
 
-<<<<<<< HEAD:src/agents/pi-hooks/compaction-safeguard.ts
-type ModelRegistryWithRequestAuthLookup = {
-  getApiKeyAndHeaders?: (
-    model: NonNullable<ExtensionContext["model"]>,
-  ) => Promise<ResolvedRequestAuth>;
+type CompactionRequestAuth = {
+  apiKey?: string;
+  headers?: Record<string, string>;
 };
 
 type ResolvedRequestAuth =
@@ -87,20 +85,14 @@ type ResolvedRequestAuth =
       ok: false;
       error: string;
     };
-=======
-type CompactionRequestAuth = {
-  apiKey?: string;
-  headers?: Record<string, string>;
-};
 
 type ModelRegistryCompat = {
   getApiKey?: (model: NonNullable<ExtensionContext["model"]>) => Promise<string | undefined>;
   getApiKeyForProvider?: (provider: string) => Promise<string | undefined>;
   getApiKeyAndHeaders?: (
     model: NonNullable<ExtensionContext["model"]>,
-  ) => Promise<{ ok: boolean; apiKey?: string; headers?: Record<string, string>; error?: string }>;
+  ) => Promise<ResolvedRequestAuth>;
 };
->>>>>>> 2063514817 (Fix compaction safeguard auth resolution for newer model registries):src/agents/pi-extensions/compaction-safeguard.ts
 
 function clampNonNegativeInt(value: unknown, fallback: number): number {
   const normalized = typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -180,10 +172,13 @@ async function resolveCompactionRequestAuth(params: {
 
   if (typeof registry.getApiKeyForProvider === "function") {
     const apiKey = await registry.getApiKeyForProvider(params.model.provider);
-    if (apiKey || params.modelHeaders) {
+    if (apiKey) {
       return { apiKey, headers: params.modelHeaders };
     }
-    return null;
+  }
+
+  if (!registry.getApiKey && params.modelHeaders) {
+    return { headers: params.modelHeaders };
   }
 
   if (typeof registry.getApiKey === "function") {
@@ -687,15 +682,6 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       return { cancel: true };
     }
 
-<<<<<<< HEAD:src/agents/pi-hooks/compaction-safeguard.ts
-    let requestAuth: ResolvedRequestAuth;
-    try {
-      const modelRegistry = ctx.modelRegistry as ModelRegistryWithRequestAuthLookup;
-      if (typeof modelRegistry.getApiKeyAndHeaders !== "function") {
-        throw new Error("model registry auth lookup unavailable");
-      }
-      requestAuth = await modelRegistry.getApiKeyAndHeaders(model);
-=======
     const modelHeaders =
       model.headers && typeof model.headers === "object" && !Array.isArray(model.headers)
         ? model.headers
@@ -707,7 +693,6 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
         modelRegistry: ctx.modelRegistry,
         modelHeaders,
       });
->>>>>>> 2063514817 (Fix compaction safeguard auth resolution for newer model registries):src/agents/pi-extensions/compaction-safeguard.ts
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       log.warn(
@@ -719,24 +704,8 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       );
       return { cancel: true };
     }
-<<<<<<< HEAD:src/agents/pi-hooks/compaction-safeguard.ts
-    if (!requestAuth.ok) {
-=======
     const apiKey = resolvedAuth?.apiKey ?? "";
     const headers = resolvedAuth?.headers;
-    if (!apiKey && !headers) {
->>>>>>> 2063514817 (Fix compaction safeguard auth resolution for newer model registries):src/agents/pi-extensions/compaction-safeguard.ts
-      log.warn(
-        `Compaction safeguard: request credential resolution failed for ${model.provider}/${model.id}: ${requestAuth.error}`,
-      );
-      setCompactionSafeguardCancelReason(
-        ctx.sessionManager,
-        `Compaction safeguard could not resolve request credentials for ${model.provider}/${model.id}: ${requestAuth.error}`,
-      );
-      return { cancel: true };
-    }
-    const apiKey = requestAuth.apiKey;
-    const headers = requestAuth.headers;
     if (!apiKey && !headers) {
       log.warn(
         "Compaction safeguard: no request credentials available; cancelling compaction to preserve history.",
