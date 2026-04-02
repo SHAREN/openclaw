@@ -70,6 +70,7 @@ type ToolFailure = {
   meta?: string;
 };
 
+<<<<<<< HEAD:src/agents/pi-hooks/compaction-safeguard.ts
 type ModelRegistryWithRequestAuthLookup = {
   getApiKeyAndHeaders?: (
     model: NonNullable<ExtensionContext["model"]>,
@@ -86,6 +87,20 @@ type ResolvedRequestAuth =
       ok: false;
       error: string;
     };
+=======
+type CompactionRequestAuth = {
+  apiKey?: string;
+  headers?: Record<string, string>;
+};
+
+type ModelRegistryCompat = {
+  getApiKey?: (model: NonNullable<ExtensionContext["model"]>) => Promise<string | undefined>;
+  getApiKeyForProvider?: (provider: string) => Promise<string | undefined>;
+  getApiKeyAndHeaders?: (
+    model: NonNullable<ExtensionContext["model"]>,
+  ) => Promise<{ ok: boolean; apiKey?: string; headers?: Record<string, string>; error?: string }>;
+};
+>>>>>>> 2063514817 (Fix compaction safeguard auth resolution for newer model registries):src/agents/pi-extensions/compaction-safeguard.ts
 
 function clampNonNegativeInt(value: unknown, fallback: number): number {
   const normalized = typeof value === "number" && Number.isFinite(value) ? value : fallback;
@@ -139,6 +154,47 @@ function formatToolFailureMeta(details: unknown): string | undefined {
 
 function extractToolResultText(content: unknown): string {
   return collectTextContentBlocks(content).join("\n");
+}
+
+async function resolveCompactionRequestAuth(params: {
+  model: NonNullable<ExtensionContext["model"]>;
+  modelRegistry: ExtensionContext["modelRegistry"];
+  modelHeaders?: Record<string, string>;
+}): Promise<CompactionRequestAuth | null> {
+  const registry = params.modelRegistry as ModelRegistryCompat;
+
+  if (typeof registry.getApiKeyAndHeaders === "function") {
+    const resolved = await registry.getApiKeyAndHeaders(params.model);
+    if (!resolved.ok) {
+      throw new Error(resolved.error || "Request auth lookup failed.");
+    }
+    const headers =
+      resolved.headers && Object.keys(resolved.headers).length > 0
+        ? { ...resolved.headers }
+        : params.modelHeaders;
+    if (resolved.apiKey || headers) {
+      return { apiKey: resolved.apiKey, headers };
+    }
+    return null;
+  }
+
+  if (typeof registry.getApiKeyForProvider === "function") {
+    const apiKey = await registry.getApiKeyForProvider(params.model.provider);
+    if (apiKey || params.modelHeaders) {
+      return { apiKey, headers: params.modelHeaders };
+    }
+    return null;
+  }
+
+  if (typeof registry.getApiKey === "function") {
+    const apiKey = await registry.getApiKey(params.model);
+    if (apiKey || params.modelHeaders) {
+      return { apiKey, headers: params.modelHeaders };
+    }
+    return null;
+  }
+
+  throw new Error("ctx.modelRegistry has no supported request auth method.");
 }
 
 function collectToolFailures(messages: AgentMessage[]): ToolFailure[] {
@@ -631,6 +687,7 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       return { cancel: true };
     }
 
+<<<<<<< HEAD:src/agents/pi-hooks/compaction-safeguard.ts
     let requestAuth: ResolvedRequestAuth;
     try {
       const modelRegistry = ctx.modelRegistry as ModelRegistryWithRequestAuthLookup;
@@ -638,6 +695,19 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
         throw new Error("model registry auth lookup unavailable");
       }
       requestAuth = await modelRegistry.getApiKeyAndHeaders(model);
+=======
+    const modelHeaders =
+      model.headers && typeof model.headers === "object" && !Array.isArray(model.headers)
+        ? model.headers
+        : undefined;
+    let resolvedAuth: CompactionRequestAuth | null = null;
+    try {
+      resolvedAuth = await resolveCompactionRequestAuth({
+        model,
+        modelRegistry: ctx.modelRegistry,
+        modelHeaders,
+      });
+>>>>>>> 2063514817 (Fix compaction safeguard auth resolution for newer model registries):src/agents/pi-extensions/compaction-safeguard.ts
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       log.warn(
@@ -649,7 +719,13 @@ export default function compactionSafeguardExtension(api: ExtensionAPI): void {
       );
       return { cancel: true };
     }
+<<<<<<< HEAD:src/agents/pi-hooks/compaction-safeguard.ts
     if (!requestAuth.ok) {
+=======
+    const apiKey = resolvedAuth?.apiKey ?? "";
+    const headers = resolvedAuth?.headers;
+    if (!apiKey && !headers) {
+>>>>>>> 2063514817 (Fix compaction safeguard auth resolution for newer model registries):src/agents/pi-extensions/compaction-safeguard.ts
       log.warn(
         `Compaction safeguard: request credential resolution failed for ${model.provider}/${model.id}: ${requestAuth.error}`,
       );
@@ -958,6 +1034,7 @@ export const __testing = {
   capCompactionSummary,
   capCompactionSummaryPreservingSuffix,
   formatFileOperations,
+  resolveCompactionRequestAuth,
   computeAdaptiveChunkRatio,
   isOversizedForSummary,
   readWorkspaceContextForSummary,
