@@ -1084,8 +1084,8 @@ function streamCodexProxyResponses(
 
       let body = buildRequestBody(model, context, options);
       const nextBody = await options?.onPayload?.(body, model);
-      if (nextBody && typeof nextBody === "object") {
-        body = nextBody;
+      if (nextBody && typeof nextBody === "object" && !Array.isArray(nextBody)) {
+        body = nextBody as Record<string, unknown>;
       }
 
       const requestId = options?.sessionId || createCodexRequestId();

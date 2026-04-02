@@ -9,23 +9,10 @@ import {
   wrapProviderStreamFn as wrapProviderStreamFnRuntime,
 } from "../../plugins/provider-runtime.js";
 import type { ProviderRuntimeModel } from "../../plugins/types.js";
-<<<<<<< HEAD
 import { resolveCacheRetention } from "./anthropic-cache-retention.js";
 import { createAnthropicToolPayloadCompatibilityWrapper } from "./anthropic-family-tool-payload-compat.js";
 import { createBedrockNoCacheWrapper, isAnthropicBedrockModel } from "./bedrock-stream-wrappers.js";
-=======
-import {
-  createAnthropicBetaHeadersWrapper,
-  createBedrockNoCacheWrapper,
-  createAnthropicFastModeWrapper,
-  createAnthropicToolPayloadCompatibilityWrapper,
-  isAnthropicBedrockModel,
-  resolveAnthropicFastMode,
-  resolveAnthropicBetas,
-  resolveCacheRetention,
-} from "./anthropic-stream-wrappers.js";
 import { createCodexProxyTransportWrapper } from "./codex-proxy-transport.js";
->>>>>>> ade98daf42 (Restore embedded codex-lb auth propagation and proxy Codex transport)
 import { createGoogleThinkingPayloadWrapper } from "./google-stream-wrappers.js";
 import { log } from "./logger.js";
 import { createMinimaxFastModeWrapper } from "./minimax-stream-wrappers.js";
